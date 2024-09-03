@@ -76,6 +76,7 @@ class Yolo_video:
             print( 'Yolo_video.load_model(), error: {}'.format( e ) )
             raise
 
+
     def detect( self, img, img_blob ):
         try:
             img_height = img.shape[0]
@@ -120,6 +121,51 @@ class Yolo_video:
             print('Yolo_video.detect_img(), error: {}'.format(e))
             raise
 
+    def draw_boxes(self, img_to_detect ):
+        try:
+            # Applying the NMS will return only the selected max value ids while suppressing the non maximum (weak) overlapping bounding boxes
+            # Non-Maxima Suppression confidence set as 0.5 & max_suppression threhold for NMS as 0.4 (adjust and try for better perfomance)
+            max_value_ids = cv2.dnn.NMSBoxes( self.boxes_list, self.confidences_list, 0.5, 0.4)
+
+            # loop through the final set of detections remaining after NMS and draw bounding box and write text
+            for max_valueid in max_value_ids:
+                # max_class_id = max_valueid[0]
+                max_class_id = max_valueid
+
+                box        = self.boxes_list[max_class_id]
+                start_x_pt = box[0]
+                start_y_pt = box[1]
+                box_width  = box[2]
+                box_height = box[3]
+
+                # get the predicted class id and label
+                predicted_class_id    = self.class_ids_list[max_class_id]
+                predicted_class_label = self.class_labels[predicted_class_id]
+                prediction_confidence = self.confidences_list[max_class_id]
+                ############## NMS Change 3 END ###########
+
+                end_x_pt = start_x_pt + box_width
+                end_y_pt = start_y_pt + box_height
+
+                # get a random mask color from the numpy array of colors
+                box_color = self.class_colors[predicted_class_id]
+
+                # convert the color numpy array as a list and apply to text and box
+                box_color = [int(c) for c in box_color]
+
+                # print the prediction in console
+                predicted_class_label = "{}: {:.2f}%".format(predicted_class_label, prediction_confidence * 100)
+                print("predicted object {}".format(predicted_class_label))
+
+                # draw rectangle and text in the image
+                cv2.rectangle( img_to_detect, (start_x_pt, start_y_pt), (end_x_pt, end_y_pt), box_color, 1)
+                cv2.putText  ( img_to_detect, predicted_class_label, (start_x_pt, start_y_pt - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 1)
+
+        except Exception as e:
+            print( 'Yolo_video.draw_boxes(), error: {}'.format( e ) )
+            raise
+
     def detect_video( self ):
 
         i = 0
@@ -133,14 +179,17 @@ class Yolo_video:
             ret,current_frame = self.file_video_stream.read()
             #use the video current frame instead of image
 
-            #img_to_detect = current_frame
+            self.img_to_detect = current_frame
             img_blob = self.load_img( current_frame )
 
             self.clean_nms_lists( )
 
             self.detect( current_frame, img_blob )
+            self.draw_boxes( self.img_to_detect )
 
-            cv2.imshow("p1", current_frame)
+            #cv2.imshow("p1", current_frame)
+            cv2.imshow("p1", self.img_to_detect )
+
 
             #terminate while loop if 'q' key is pressed
             if cv2.waitKey(1) & 0xFF == ord('q'):
